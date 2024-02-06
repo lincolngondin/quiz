@@ -1,21 +1,17 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"os"
 )
 
 func main() {
-	var filename string = "problems.csv"
-	var language string = "en"
-	var shuffle bool = false
-    var timer int = 30
-	if len(os.Args) >= 2 {
-        if os.Args[1] == "help" {
-            fmt.Println(GetText(language, "help"))
-            return
-        }
+	opts, helpCommand, err := ProcessArguments(os.Args)
+	if helpCommand {
+		return
 	}
-	InitGame(filename, timer, language, shuffle)
+	if err != nil {
+		log.Fatal(err)
+	}
+	InitGame(opts)
 }
-

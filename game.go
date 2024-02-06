@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"math/rand"
 	"time"
 )
 
@@ -27,39 +28,49 @@ func (game *Game) UpdateScore(right bool) {
 		game.Wrong++
 	}
 }
-func (game *Game) ShowGameResult(){
-	fmt.Printf("You got %d questions right from %d in total!", game.Correct, game.Total)
+func (game *Game) ShowGameResult(language string) {
+	fmt.Printf(GetText(language, "result"), game.Correct, game.Total)
 }
 
-func InitGame(filename string, timer int, language string, shuffle bool) {
-	questions, err := GetAllQuestionsFromFile(filename)
+func InitGame(opts QuizOpts) {
+	questions, err := GetAllQuestionsFromFile(opts.Filename)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-    channelTime := time.After(time.Second*time.Duration(timer))
-    finalizado := make(chan bool)
-    var game *Game = NewGame(len(questions))
+	var channelTime <-chan time.Time
+	if opts.Timer != 0 {
+		channelTime = time.After(time.Second * time.Duration(opts.Timer))
+	}
+	finalizado := make(chan bool)
+	var game *Game = NewGame(len(questions))
 
-    go func(game *Game,fim chan bool) {
-        var answer string
-        var actualQuestion Question
-        for questionNumber := 0; questionNumber < len(questions); questionNumber++{
-            actualQuestion = questions[questionNumber]
-            fmt.Printf("\nQuestion #%d: %s\n", questionNumber+1, actualQuestion.Statement)
-            fmt.Printf("Your answer: ")
-            fmt.Scanln(&answer)
-            game.UpdateScore(answer == actualQuestion.Answer)
-        }
-        fim<-true
-    }(game, finalizado)
+	go func(game *Game, fim chan bool) {
+		var answer string
+		var actualQuestion Question
 
-    select {
-        case <-channelTime:
-            fmt.Println("\nTimeout!")
-        case <-finalizado:
-            fmt.Println("Terminou normal!")
-    }
-    game.ShowGameResult()
+		if opts.Shuffle {
+			for i, question := range questions {
+				newPos := rand.Intn(len(questions))
+				questions[i] = questions[newPos]
+				questions[newPos] = question
+			}
+		}
+
+		for questionNumber := 0; questionNumber < len(questions); questionNumber++ {
+			actualQuestion = questions[questionNumber]
+			fmt.Printf(GetText(opts.Language, "show_question"), questionNumber+1, actualQuestion.Statement)
+			fmt.Printf(GetText(opts.Language, "input_question"))
+			fmt.Scanln(&answer)
+			game.UpdateScore(answer == actualQuestion.Answer)
+		}
+		fim <- true
+	}(game, finalizado)
+
+	select {
+	case <-channelTime:
+		fmt.Println(GetText(opts.Language, "timeout_message"))
+	case <-finalizado:
+	}
+	game.ShowGameResult(opts.Language)
 }
-
